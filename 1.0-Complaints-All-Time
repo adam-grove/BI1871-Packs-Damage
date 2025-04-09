@@ -1,0 +1,72 @@
+
+-- With Pre Boxed
+with transactions_with_pre_boxed as 
+(
+  select transaction_date,transaction_id, string_agg(distinct config_sku, "|" order by config_sku) as config_SKUs
+  from `data_marts.transaction_products_p`
+  where config_sku in ("FODVEGBAR", "FODBLBAR20PACK", "FODLEG12PCK", "FODLODLEG")
+  group by transaction_date, transaction_id
+),
+quality_issues as 
+(
+  select distinct magento_order, 
+  from `data_marts.quality_issues` t1
+  where item_quality_issue_type_name  = "Packaging – Hole/ split"
+),
+quality_issues_date as 
+(
+  select t1.magento_order, t2.date
+  from quality_issues  t1
+  inner join `data_marts.transactions` t2 on t1.magento_order = t2.transaction_id 
+),
+holes_boxed as 
+(
+  select 
+  t1.transaction_date,
+  t1.transaction_id as preboxed,
+  t2.magento_order as quality_issues
+  from transactions_with_pre_boxed t1
+  left join quality_issues_date t2
+    on t1.transaction_date = t2.date
+    and t1.transaction_id = t2.magento_order
+)
+select 
+count(distinct preboxed) as preboxed,
+count(distinct quality_issues) as quality_issues
+from holes_boxed;
+
+-- Without Pre Boxed
+with transactions_without_pre_boxed as 
+(
+  select transaction_date,transaction_id, string_agg(distinct config_sku, "|" order by config_sku) as config_SKUs
+  from `data_marts.transaction_products_p`
+  where config_sku not in ("FODVEGBAR", "FODBLBAR20PACK", "FODLEG12PCK", "FODLODLEG")
+  group by transaction_date, transaction_id
+),
+quality_issues as 
+(
+  select distinct magento_order, 
+  from `data_marts.quality_issues` t1
+  where item_quality_issue_type_name  = "Packaging – Hole/ split"
+),
+quality_issues_date as 
+(
+  select t1.magento_order, t2.date
+  from quality_issues  t1
+  inner join `data_marts.transactions` t2 on t1.magento_order = t2.transaction_id 
+),
+holes_boxed as 
+(
+  select 
+  t1.transaction_date,
+  t1.transaction_id as preboxed,
+  t2.magento_order as quality_issues
+  from transactions_with_pre_boxed t1
+  left join quality_issues_date t2
+    on t1.transaction_date = t2.date
+    and t1.transaction_id = t2.magento_order
+)
+select 
+count(distinct preboxed) as preboxed,
+count(distinct quality_issues) as quality_issues
+from holes_boxed;
