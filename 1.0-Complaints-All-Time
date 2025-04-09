@@ -2,10 +2,23 @@
 -- With Pre Boxed
 with transactions_with_pre_boxed as 
 (
-  select transaction_date,transaction_id, string_agg(distinct config_sku, "|" order by config_sku) as config_SKUs
+  select transaction_date,transaction_id # , string_agg(distinct config_sku, "|" order by config_sku) as config_SKUs
   from `data_marts.transaction_products_p`
-  where config_sku in ("FODVEGBAR", "FODBLBAR20PACK", "FODLEG12PCK", "FODLODLEG")
+  where 1=1
+    and config_sku in 
+      ("FODVEGBAR",
+       "FODBLBAR20PACK",
+       "FODLEG12PCK", 
+       "FODLODLEG", 
+       "ACCSILSHAK", 
+       "ACCGOLDSTEEL", 
+       "ACCORASHAK", 
+       "ACCWHISHAKE", 
+       "ACCSHKGEN")
+    and country = "UK"
+    and transaction_date between "2024-04-08" and "2025-04-08"
   group by transaction_date, transaction_id
+  order by transaction_date desc
 ),
 quality_issues as 
 (
@@ -33,15 +46,28 @@ holes_boxed as
 select 
 count(distinct preboxed) as preboxed,
 count(distinct quality_issues) as quality_issues
-from holes_boxed;
+from holes_boxed
 
 -- Without Pre Boxed
 with transactions_without_pre_boxed as 
 (
-  select transaction_date,transaction_id, string_agg(distinct config_sku, "|" order by config_sku) as config_SKUs
+  select transaction_date,transaction_id # , string_agg(distinct config_sku, "|" order by config_sku) as config_SKUs
   from `data_marts.transaction_products_p`
-  where config_sku not in ("FODVEGBAR", "FODBLBAR20PACK", "FODLEG12PCK", "FODLODLEG")
+  where 1=1
+    and config_sku not in 
+      ("FODVEGBAR",
+       "FODBLBAR20PACK",
+       "FODLEG12PCK", 
+       "FODLODLEG", 
+       "ACCSILSHAK", 
+       "ACCGOLDSTEEL", 
+       "ACCORASHAK", 
+       "ACCWHISHAKE", 
+       "ACCSHKGEN")
+    and country = "UK"
+    and transaction_date between "2024-04-08" and "2025-04-08"
   group by transaction_date, transaction_id
+  order by transaction_date desc
 ),
 quality_issues as 
 (
@@ -61,7 +87,7 @@ holes_boxed as
   t1.transaction_date,
   t1.transaction_id as preboxed,
   t2.magento_order as quality_issues
-  from transactions_with_pre_boxed t1
+  from transactions_without_pre_boxed t1
   left join quality_issues_date t2
     on t1.transaction_date = t2.date
     and t1.transaction_id = t2.magento_order
@@ -69,4 +95,4 @@ holes_boxed as
 select 
 count(distinct preboxed) as preboxed,
 count(distinct quality_issues) as quality_issues
-from holes_boxed;
+from holes_boxed
