@@ -1,11 +1,70 @@
 
--- With Pre Boxed
-with transactions_with_pre_boxed as 
+with box_items as 
 (
-  select transaction_date,transaction_id # , string_agg(distinct config_sku, "|" order by config_sku) as config_SKUs
+  select
+  transaction_date,
+  transaction_id ,
+  config_sku,
+  case when config_sku in (
+    "FODVEGBAR",
+    "FODBLBAR20PACK",
+    "FODLEG12PCK", 
+    "FODLODLEG", 
+    "ACCSILSHAK", 
+    "ACCGOLDSTEEL", 
+    "ACCORASHAK", 
+    "ACCWHISHAKE", 
+    "ACCSHKGEN") then item_quantity end as boxed,
+   case when config_sku in (
+    "FODVEGBAR",
+    "FODBLBAR20PACK",
+    "FODLEG12PCK", 
+    "FODLODLEG", 
+    "ACCSILSHAK", 
+    "ACCGOLDSTEEL", 
+    "ACCORASHAK", 
+    "ACCWHISHAKE", 
+    "ACCSHKGEN") then config_sku end as boxed_sku,
+  case when config_sku not in (
+    "FODVEGBAR",
+    "FODBLBAR20PACK",
+    "FODLEG12PCK", 
+    "FODLODLEG", 
+    "ACCSILSHAK", 
+    "ACCGOLDSTEEL", 
+    "ACCORASHAK", 
+    "ACCWHISHAKE", 
+    "ACCSHKGEN") then item_quantity end as non_boxed,  
   from `data_marts.transaction_products_p`
   where 1=1
-    and config_sku in 
+    and country = "UK"
+    and transaction_date between "2024-04-08" and "2025-04-08"
+),
+transactions_with_metrics as
+(
+  select 
+  transaction_date,
+  transaction_id,
+  string_agg(distinct boxed_sku, "|" order by boxed_sku) as boxed_skus,
+  sum(boxed) as num_boxed_items,
+  sum(non_boxed) as num_non_boxed_items,
+  sum(boxed) + sum(non_boxed) as num_total_items
+  from box_items
+  group by transaction_date, transaction_id
+),
+transactions_with_pre_boxed as
+(
+  select * 
+  from transactions_with_metrics
+  where num_boxed_items is not null
+),
+
+transactions_with_pre_boxed_old as 
+(
+  select transaction_date,transaction_id  , string_agg(distinct config_sku, "|" order by config_sku) as config_SKUs
+  from box_items 
+  where 1=1
+    and config_sku  in 
       ("FODVEGBAR",
        "FODBLBAR20PACK",
        "FODLEG12PCK", 
@@ -15,7 +74,7 @@ with transactions_with_pre_boxed as
        "ACCORASHAK", 
        "ACCWHISHAKE", 
        "ACCSHKGEN")
-    and country = "UK"
+    -- and country = "UK"
     and transaction_date between "2024-04-08" and "2025-04-08"
   group by transaction_date, transaction_id
   order by transaction_date desc
@@ -43,6 +102,7 @@ holes_boxed as
     on t1.transaction_date = t2.date
     and t1.transaction_id = t2.magento_order
 )
+
 select 
 count(distinct preboxed) as preboxed,
 count(distinct quality_issues) as quality_issues
