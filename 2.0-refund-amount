@@ -56,7 +56,7 @@ transactions_with_pre_boxed as -- Change here !
   select * 
   from transactions_with_metrics
   where 1=1
-  and boxed_skus like '%ACCSHKGEN%'
+  -- and boxed_skus like '%ACCSHKGEN%'
   and num_non_boxed_items is not  null
 ),
 quality_issues as 
@@ -83,6 +83,22 @@ holes_boxed as
     on t1.transaction_date = t2.date
     and t1.transaction_id = t2.magento_order
 ),
+refunds_filtered as 
+(
+  select t1.*
+  from `tpw-data-warehouse.data_marts.refunds_all_dates_all_countries` t1
+  inner join `data_marts.quality_issues` t2 on t1.magento_order = t2.magento_order
+  where t2.config_sku not in (
+    "FODVEGBAR",
+    "FODBLBAR20PACK",
+    "FODLEG12PCK", 
+    "FODLODLEG", 
+    "ACCSILSHAK", 
+    "ACCGOLDSTEEL", 
+    "ACCORASHAK", 
+    "ACCWHISHAKE", 
+    "ACCSHKGEN")
+),
 holes_boxed_refund as
 (
   select t1.* ,
@@ -104,4 +120,6 @@ results as
   from holes_boxed_refund
 ) 
 select * 
-from results
+from holes_boxed_refund
+where refund is not null 
+and boxed_skus like '%FODVEGBAR%'
