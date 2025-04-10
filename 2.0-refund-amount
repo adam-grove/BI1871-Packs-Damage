@@ -1,0 +1,107 @@
+with box_items as 
+(
+  select
+  transaction_date,
+  transaction_id ,
+  config_sku,
+  case when config_sku in (
+    "FODVEGBAR",
+    "FODBLBAR20PACK",
+    "FODLEG12PCK", 
+    "FODLODLEG", 
+    "ACCSILSHAK", 
+    "ACCGOLDSTEEL", 
+    "ACCORASHAK", 
+    "ACCWHISHAKE", 
+    "ACCSHKGEN") then item_quantity end as boxed,
+   case when config_sku in (
+    "FODVEGBAR",
+    "FODBLBAR20PACK",
+    "FODLEG12PCK", 
+    "FODLODLEG", 
+    "ACCSILSHAK", 
+    "ACCGOLDSTEEL", 
+    "ACCORASHAK", 
+    "ACCWHISHAKE", 
+    "ACCSHKGEN") then config_sku end as boxed_sku,
+  case when config_sku not in (
+    "FODVEGBAR",
+    "FODBLBAR20PACK",
+    "FODLEG12PCK", 
+    "FODLODLEG", 
+    "ACCSILSHAK", 
+    "ACCGOLDSTEEL", 
+    "ACCORASHAK", 
+    "ACCWHISHAKE", 
+    "ACCSHKGEN") then item_quantity end as non_boxed,  
+  from `data_marts.transaction_products_p`
+  where 1=1
+    and country = "UK"
+    and transaction_date between "2024-04-08" and "2025-04-08"
+),
+transactions_with_metrics as
+(
+  select 
+  transaction_date,
+  transaction_id,
+  string_agg(distinct boxed_sku, "|" order by boxed_sku) as boxed_skus,
+  sum(boxed) as num_boxed_items,
+  sum(non_boxed) as num_non_boxed_items,
+  sum(boxed) + sum(non_boxed) as num_total_items
+  from box_items
+  group by transaction_date, transaction_id
+),
+transactions_with_pre_boxed as -- Change here !
+(
+  select * 
+  from transactions_with_metrics
+  where 1=1
+  and boxed_skus like '%ACCSHKGEN%'
+  and num_non_boxed_items is not  null
+),
+quality_issues as 
+(
+  select distinct magento_order, 
+  from `data_marts.quality_issues` t1
+  where item_quality_issue_type_name  = "Packaging – Hole/ split"
+),
+quality_issues_date as 
+(
+  select t1.magento_order, t2.date
+  from quality_issues  t1
+  inner join `data_marts.transactions` t2 on t1.magento_order = t2.transaction_id 
+),
+holes_boxed as 
+(
+  select 
+  t1.transaction_date,
+  t1.transaction_id as preboxed,
+  t2.magento_order as quality_issues,
+  t1.boxed_skus,
+  from transactions_with_pre_boxed t1
+  left join quality_issues_date t2
+    on t1.transaction_date = t2.date
+    and t1.transaction_id = t2.magento_order
+),
+holes_boxed_refund as
+(
+  select t1.* ,
+  t2.magento_order as refund,
+  t2.refund_amount 
+  from holes_boxed t1
+  left join `tpw-data-warehouse.data_marts.refunds_all_dates_all_countries` t2
+    on t1.quality_issues = t2.magento_order
+),
+
+results as
+(
+  select 
+  count(distinct preboxed) as contains_preboxd,
+  count(distinct quality_issues) as complaints,
+  safe_divide(count(distinct quality_issues) , count(distinct preboxed)) * 1000 as count_per_k,
+  count(distinct refund) as refund,
+  sum(refund_amount) as refund_amount
+  from holes_boxed_refund
+) 
+select * 
+from results
