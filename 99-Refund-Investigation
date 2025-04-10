@@ -1,18 +1,18 @@
 select * 
 from `data_marts.transaction_products`
-where transaction_id = "119137611243696";
+where transaction_id = "12612819249636";
 
 
 select * 
 from `data_marts.quality_issues`
-where magento_order = "119137611243696";
+where magento_order = "12612819249636";
 
 
 select * 
 from `data_lake.refunds`
-where magento_order = "119137611243696";
+where magento_order = "12612819249636";
 
 select * 
 from `data_marts.transaction_products`
-where email_address in (select email_address from `data_marts.transactions` where transaction_id = "119137611243696")
-and transaction_date > "2024-11-19";
+where email_address in (select email_address from `data_marts.transactions` where transaction_id = "12612819249636")
+and transaction_date > (select date from `data_marts.transactions` where transaction_id = "12612819249636");
